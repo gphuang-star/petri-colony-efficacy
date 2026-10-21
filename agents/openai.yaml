@@ -1,0 +1,4 @@
+interface:
+  display_name: "Petri Colony Efficacy"
+  short_description: "皿内菌落直径测量与防效计算"
+  default_prompt: "Use $petri-colony-efficacy to measure colony diameters and calculate control efficacy against CK."

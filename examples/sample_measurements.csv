@@ -1,0 +1,10 @@
+experiment_id,sample_id,treatment,replicate,diameter_1,diameter_2,unit,plug_diameter_mm,dish_diameter_mm,measurement_plane,edge_type,notes
+EXP1,CK-1,CK,1,42.1,43.0,mm,6,86,bottom_inner,regular,
+EXP1,CK-2,CK,2,41.8,42.6,mm,6,86,bottom_inner,regular,
+EXP1,CK-3,CK,3,42.5,43.2,mm,6,86,bottom_inner,regular,
+EXP1,T1-1,T1_50ppm,1,13.2,13.8,mm,6,86,bottom_inner,regular,
+EXP1,T1-2,T1_50ppm,2,12.9,13.5,mm,6,86,bottom_inner,regular,
+EXP1,T1-3,T1_50ppm,3,13.5,14.0,mm,6,86,bottom_inner,regular,
+EXP1,T2-1,T2_10ppm,1,27.5,28.2,mm,6,86,bottom_inner,regular,
+EXP1,T2-2,T2_10ppm,2,27.0,28.0,mm,6,86,bottom_inner,regular,
+EXP1,T2-3,T2_10ppm,3,28.1,28.9,mm,6,86,bottom_inner,regular,

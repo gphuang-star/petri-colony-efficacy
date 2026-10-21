@@ -1,0 +1,15 @@
+# 基础依赖（必装）
+numpy>=1.24,<2.3
+opencv-python>=4.5
+Pillow>=9.0
+openpyxl>=3.0
+
+# 高精度模式（可选，装了才能用 SAM + 细化模型）
+# CPU 版即可，体积较大但精度明显更好
+# torch>=2.0
+# torchvision>=0.15
+# segment-anything @ git+https://github.com/facebookresearch/segment-anything.git
+
+# 提示：
+# 1) torch 2.2 及更早版本需要 numpy<2，若同时装 SAM 请固定 numpy<2
+# 2) 不装 torch 时程序自动使用"径向纹理"快速引擎（0.2 秒/张，精度略低）

@@ -1,0 +1,4 @@
+experiment_id,sample_id,treatment,replicate,image_path,plug_diameter_mm,tip_color,dish_diameter_mm,reference_diameter_mm,measurement_plane,camera_angle,scale_axis,rays,method,main_colony_mode,edge_type,notes
+EXP1,水稻纹枯_CK_r1,水稻纹枯_CK,1,C:\photos\水稻纹枯_CK_r1.jpg,6,yellow,86,86,bottom_inner,top_down,major,4,auto,auto,irregular,
+EXP1,水稻纹枯_CK_r2,水稻纹枯_CK,2,C:\photos\水稻纹枯_CK_r2.jpg,6,yellow,86,86,bottom_inner,top_down,major,4,auto,auto,irregular,
+EXP1,水稻纹枯_嘧菌酯_r1,水稻纹枯_嘧菌酯,1,C:\photos\水稻纹枯_嘧菌酯_r1.jpg,6,yellow,86,86,bottom_inner,top_down,major,4,auto,auto,irregular,

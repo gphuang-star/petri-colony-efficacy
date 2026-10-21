@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: "Petri Colony Efficacy — 皿内菌落直径测量与防效统计"
+message: "如果本项目对你的研究有帮助，请按下列信息引用。"
+type: software
+authors:
+  - name: "gphuang"
+version: "2.0.0"
+date-released: "2026-10-09"
+license: MIT
+repository-code: "https://github.com/gphuang-star/petri-colony-efficacy"
+keywords:
+  - mycology
+  - colony diameter
+  - control efficacy
+  - image analysis
+  - plant pathology
+abstract: >-
+  批量测量培养皿内菌落直径并按 CK 计算相对防效的工具，支持十字交叉法取值、
+  培养皿直径标定、菌饼直径(6/8mm)校正、三重复处理汇总、人工框取修正与
+  Excel 导出，并提供可继续训练的边界细化模型。
