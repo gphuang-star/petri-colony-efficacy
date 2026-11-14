@@ -72,7 +72,7 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
  .mfoot{padding:8px 14px;font-size:12.5px;color:#5b6a86;background:#f7f9fc;border-top:1px solid #eaeff6}
  .mfoot b{color:#2f6fd0}
 </style></head><body>
-<header>
+<header><button class="ghost" onclick="location.href='/'">编号与一键改名</button>
   <b>菌落直径测量结果</b>
   <span class="path" id="path" title="__FOLDER__">__FOLDER__</span>
   <span class="stat" id="stats">…</span>
@@ -181,6 +181,7 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
    var meta = document.createElement('div');
    meta.innerHTML =
      '<div class="nm">' + esc(c.name) + '</div>' +
+     (c.treatment ? '<div class="hv">处理：'+esc(c.treatment)+' · 编号 '+esc(c.treatment_code||'')+' · 重复 '+esc(c.replicate||'未知')+'</div>' : '') +
      '<div class="big">' + (mm==null ? '—' : mm.toFixed(2)) + '<small>mm</small></div>' +
      hv +
      '<div class="st' + (fixed?' fix':(rev?' rev':'')) + '">' + st + '</div>' +
@@ -194,7 +195,7 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
    var g = document.getElementById('grid'); g.innerHTML = '';
    var shown = 0, lastStrain = null;
    var list = DATA.slice().sort(function(a,b){
-     var pa=parseName(a.name), pb=parseName(b.name);
+     var pa=parseCard(a), pb=parseCard(b);
      var sa=pa?pa.strain:'~', sb=pb?pb.strain:'~';
      if(sa!==sb) return sa.localeCompare(sb);
      var ta=pa?pa.treat:a.name, tb=pb?pb.treat:b.name;
@@ -206,7 +207,7 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
      if(FLT==='review' && !isReview(c)) return;
      if(FLT==='fixed'  && !isFixed(c))  return;
      shown++;
-     var pr = parseName(c.name);
+     var pr = parseCard(c);
      if(pr && pr.strain !== lastStrain){
        var gh = document.createElement('div'); gh.className='ghead';
        gh.innerHTML = esc(pr.strain) + '<span>' + esc(c.folder) + '</span>';
@@ -313,6 +314,10 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
    else if(act==='reset') window.resetMM(k);
  });
 
+ function parseCard(c){
+   if(c.treatment){ return {strain:(c.experiment_id||c.folder)+' / '+(c.strain||'本批次'), treat:c.treatment}; }
+   return parseName(c.name);
+ }
  function parseName(name){
    var base = String(name).replace(/\.[^.]+$/, '');
    var parts = base.split(/[_\-\s]+/).filter(Boolean);
@@ -326,7 +331,7 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
  function groups(){
    var g = {};
    DATA.forEach(function(c){
-     var p = parseName(c.name); if(!p) return;
+     var p = parseCard(c); if(!p) return;
      var mm = val(c); if(mm==null) return;
      (g[p.strain] = g[p.strain] || {})[p.treat] = ((g[p.strain]||{})[p.treat] || []).concat([mm]);
    });
@@ -370,9 +375,7 @@ PAGE = r"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
  document.getElementById('q').oninput = function(){ Q = this.value.trim().toLowerCase(); render(); };
  document.getElementById('flt').onchange = function(){ FLT = this.value; render(); };
  window.pickFolder = function(){
-   fetch('/pick',{method:'POST'}).then(function(r){return r.json();}).then(function(j){
-     if(j && j.ok) location.reload(); else if(j && j.error) alert(j.error);
-   });
+   location.href='/';
  };
  window.exportExcel = function(){
    var rows = DATA.map(function(c){

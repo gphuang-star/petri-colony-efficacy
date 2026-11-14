@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 import base64, csv, io, json, os, sys, threading, time, webbrowser, math
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer as HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
 import ctypes
@@ -27,9 +27,10 @@ sys.path.insert(0, str(APP_DIR))
 from measure_colony_image import imread_unicode, detect_dish
 from radial_texture_engine import radial_boundary, centroid_cross
 import excel_export
+import ui_naming, naming_http
 import ui_result                      # 面向最终用户的「测量结果」页面
 
-APP_NAME = "皿内菌落直径测量 v2.0（高精度版）"
+APP_NAME = "皿内菌落直径测量 v2.1.0（编号改名版）"
 MODE = os.environ.get("COLONY_MODE", "hq")      # hq = SAM+细化 ; fast = 径向纹理
 # 默认给最终用户看"测量结果"页；加 --annotate 则显示"人工标注"页（训练用）
 ANNOTATE = ("--annotate" in sys.argv) or (os.environ.get("COLONY_UI") == "annotate")
@@ -41,6 +42,7 @@ except Exception as _e:
 IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 OUT_NAME = "菌落测量输出"          # 程序自己的输出目录，扫描时排除，避免把掩膜当输入图
 WORK_DIM = 1400
+METADATA = {}
 DISH_MM = float(os.environ.get("COLONY_DISH_MM", "86"))
 PLUG_MM = float(os.environ.get("COLONY_PLUG_MM", "6"))
 
@@ -245,7 +247,7 @@ def build_cards(files, measures):
             try:
                 im = Image.fromarray(cv2.cvtColor(m.img, cv2.COLOR_BGR2RGB))
             except Exception:
-                continue
+                im = Image.new('RGB', (320, 240), '#202c3d')
         im.thumbnail((640, 640))
         buf = io.BytesIO(); im.save(buf, format="JPEG", quality=82)
         b64 = base64.b64encode(buf.getvalue()).decode()
@@ -261,9 +263,10 @@ def build_cards(files, measures):
         ywt = max(2, int(round(0.008 * max(im.width, im.height))))   # 黄线在缩略图坐标下的线宽
         _mmpp = float(getattr(m, "mmpp", 0) or 0)
         mpt = round(_mmpp / sc, 6) if sc else 0     # 缩略图坐标下 1 像素 = 多少 mm
-        cards.append(dict(
+        meta = METADATA.get(str(Path(p).resolve()), {})
+        cards.append(dict(**meta,
             # --- 结果页字段 ---
-            key=f"{idx:05d}|{p.name}", stem=p.stem, name=p.name, folder=p.parent.name, b64=b64,
+            key=f"{idx:05d}|{p.name}", measure_index=idx, stem=p.stem, name=p.name, folder=p.parent.name, b64=b64,
             mm=(None if mm is None else round(float(mm), 3)),
             m1=(None if not m1 else round(float(m1), 3)),
             m2=(None if not m2 else round(float(m2), 3)), note=note,
@@ -298,8 +301,19 @@ STATE = {"page": "", "folder": "", "cards": [], "measures": [], "files": []}
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_GET(self):
-        p = urlparse(self.path).path
-        if p in ("/", "/index.html"):
+        parsed = urlparse(self.path)
+        p = parsed.path
+        if naming_http.handle_get(self, parsed): return
+        if p in ('/', '/index.html', '/naming'):
+            body = ui_naming.build_page().encode('utf-8')
+            self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(body))); self.end_headers(); self.wfile.write(body)
+            return
+        if p == '/results':
+            if not STATE.get('cards'):
+                body = '<meta charset="utf-8"><p>尚未测量。<a href="/">返回编号与测量首页</a></p>'.encode('utf-8')
+                self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body); return
             # 按最新的 STATE 重建页面：刷新浏览器不会丢掉人工测量/修正过的值
             try:
                 if STATE.get("cards"):
@@ -315,14 +329,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404); self.end_headers()
     def do_POST(self):
         path = urlparse(self.path).path
+        if naming_http.handle_post(self, path): return
         if path == "/pick":
-            try:
-                f = pick_folder()
-                if not f: self._json({"ok": False, "error": ""}); return
-                load_folder(f)
-                self._json({"ok": True, "folder": f})
-            except Exception as e:
-                self._json({"ok": False, "error": str(e)})
+            naming_http.handle_post(self, '/naming/pick')
             return
         if path == "/manual":
             n = int(self.headers.get("Content-Length", 0))
@@ -335,7 +344,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"ok": False, "error": "找不到该图片"}); return
                 if len(pts) != 4:
                     self._json({"ok": False, "error": "需要 4 个点（横线 2 点 + 竖线 2 点）"}); return
-                m = STATE["measures"][idx]
+                m = STATE["measures"][STATE["cards"][idx]['measure_index']]
                 sc = STATE["cards"][idx].get("_sc") or 1.0
                 P = [(float(p[0]) / sc, float(p[1]) / sc) for p in pts]
                 m1 = math.hypot(P[0][0]-P[1][0], P[0][1]-P[1][1]) * m.mmpp
@@ -366,12 +375,14 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(n).decode("utf-8"))
             out = Path(STATE["folder"]) / f"菌落直径测量结果_{time.strftime('%Y%m%d_%H%M')}.xlsx"
             items = []
-            bykey = {c.get("key"): m for c, m in zip(STATE["cards"], STATE["measures"])}
+            bykey = {c.get("key"): STATE['measures'][c['measure_index']] for c in STATE['cards']}
             for row in payload:
                 cls = type("It", (), {})()
                 k = row.get("key") or row.get("stem")
                 ref = bykey.get(k)
                 cls.path = getattr(ref, "path", None) or (Path(STATE["folder"]) / str(k))
+                for field, value in METADATA.get(str(Path(cls.path).resolve()), {}).items():
+                    setattr(cls, field, value)
                 cls.final_mm = (lambda v: (lambda: v))(row["mm"])
                 cls.final_m = (lambda a, b: (lambda: (a, b)))(row.get("m1") or 0, row.get("m2") or 0)
                 cls.status = (lambda s: (lambda: s))(row.get("status", ""))
@@ -394,10 +405,12 @@ def free_port(start=8765):
             except OSError: continue
     return start
 
-def load_folder(folder):
+def load_folder(folder, files=None, metadata=None, progress=None):
     """测量整个文件夹并刷新页面状态"""
     folder = str(Path(folder).resolve())
-    files = sorted([p for p in Path(folder).rglob("*")
+    global METADATA
+    METADATA = metadata or {}
+    files = files if files is not None else sorted([p for p in Path(folder).rglob("*")
                     if p.is_file() and p.suffix.lower() in IMG_EXT
                     and OUT_NAME not in p.parts and "auto_masks" not in p.parts],
                    key=lambda p: (str(p.parent), p.name))
@@ -407,12 +420,13 @@ def load_folder(folder):
     measures = []
     for i, p in enumerate(files, 1):
         try:
-            m = Measure(p)
+            m = Measure(p, DISH_MM, PLUG_MM)
         except Exception as e:
             m = Measure.__new__(Measure); m.path = p; m.ok = False; m.error = f"读取失败: {e}"
             m.manual_mm = None; m.manual_m = None; m.manual_cross = None; m.manual_center = None
             m.note = ""; m.mmpp = 1.0; m.cx = m.cy = m.r = 0
         measures.append(m)
+        if progress: progress(i)
         if i % 20 == 0 or i == len(files): print(f"  {i}/{len(files)}")
     # ---- 保存自动掩膜与汇总，供后续训练使用 ----
     try:
@@ -469,17 +483,13 @@ def main():
         print("未选择文件夹，程序已退出。", flush=True)
         return 2
     print("已选择文件夹：" + str(folder), flush=True)
-    if MODE == "hq" and engine_sam is not None:
-        try: engine_sam.load_models(log=print)
-        except Exception as e: print("高精度模型加载失败，改用快速模式:", e)
-    try: load_folder(folder)
-    except Exception as e:
-        _msgbox(str(e), APP_NAME, 0x40); return 1
+    naming_http.initialize(sys.modules[__name__], folder)
     port = free_port()
     srv = HTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}/"
     print("界面地址:", url, "\n（关闭本窗口即结束程序）")
-    threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+    if "--no-browser" not in sys.argv:
+        threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
 

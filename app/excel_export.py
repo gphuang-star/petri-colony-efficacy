@@ -47,7 +47,7 @@ def write_xlsx(path, items, dish_mm, plug_mm):
     # ---------------- Sheet1 测量结果 ----------------
     ws = wb.active; ws.title = "测量结果"
     hdr = ["序号", "图片文件名", "文件夹", "直径(mm)", "横(mm)", "竖(mm)", "状态", "备注/提示",
-           "皿径(mm)", "菌饼(mm)"]
+           "皿径(mm)", "菌饼(mm)", "实验批次", "菌株", "处理编号", "处理全名", "重复号（空白为未知）", "原始文件名"]
     ws.append(hdr)
     for i, it in enumerate(items, 1):
         mm = it.final_mm() if hasattr(it, "final_mm") else None
@@ -60,7 +60,9 @@ def write_xlsx(path, items, dish_mm, plug_mm):
                    None if not m2 else round(float(m2), 2),
                    it.status() if hasattr(it, "status") else "失败",
                    (getattr(it, "note", "") or getattr(it, "error", "")),
-                   dish_mm, plug_mm])
+                   dish_mm, plug_mm, getattr(it,"experiment_id",""), getattr(it,"strain",""),
+                   getattr(it,"treatment_code",""),getattr(it,"treatment",""),getattr(it,"replicate",""),
+                   getattr(it,"original_name",Path(it.path).name)])
     for row in ws.iter_rows(min_row=2):
         for c in row: c.border = BORDER
         row[3].number_format = "0.00"; row[4].number_format = "0.00"; row[5].number_format = "0.00"
@@ -73,7 +75,11 @@ def write_xlsx(path, items, dish_mm, plug_mm):
     for it in items:
         mm = it.final_mm() if hasattr(it, "final_mm") else None
         if mm is None: continue
-        strain, treat = _parse(Path(it.path).name)
+        if getattr(it, 'treatment', ''):
+            strain = (getattr(it,'experiment_id','') or Path(it.path).parent.name) + ' / ' + (getattr(it,'strain','') or '本批次')
+            treat = it.treatment
+        else:
+            strain, treat = _parse(Path(it.path).name)
         groups[(strain, treat)].append(float(mm))
         if strain: strains.add(strain)
     made_summary = False
@@ -102,12 +108,13 @@ def write_xlsx(path, items, dish_mm, plug_mm):
     ws3 = wb.create_sheet("参数与说明")
     ws3.append(["项目", "值 / 说明"])
     info = [
-        ("程序", "皿内菌落直径测量 v1.0"),
+        ("程序", "皿内菌落直径测量 v2.1.0（编号改名版）"),
         ("导出时间", datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
         ("培养皿直径", f"{dish_mm:g} mm"),
         ("菌饼直径", f"{plug_mm:g} mm（黄色枪头 6mm / 蓝色枪头 8mm）"),
         ("测量方法", "以皿径标定像素比例；沿径向采样菌丝纹理找到菌落外缘；过菌落质心作十字交叉，取横、竖两条直径的平均值。也可在界面上用“人工十字测量”点击两点手工量取。"),
         ("防效公式", "防效(%) = (CK平均直径 − 处理平均直径) / (CK平均直径 − 菌饼直径) × 100"),
+        ("编号分组", "编号工作流使用人工确认的处理字段。重复号留空时不推断培养皿身份；汇总数量为照片数，排除同皿复拍后才能解释为独立重复。"),
         ("状态含义", "自动＝未发现异常；需复核＝菌落很小/对比度低/超过皿径等，建议人工确认；人工修正＝已手动设定直径；失败＝未检测到培养皿或识别失败。"),
         ("注意", "毛状菌丝、近满皿、深色培养基等情形识别可能偏小，请重点复核这些图片（状态列会提示）。"),
         ("建议拍摄", "俯拍、皿居中、镜头尽量垂直于皿面、避免强反光与皿底拍摄。"),

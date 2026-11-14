@@ -1,9 +1,10 @@
 ---
 name: petri-colony-efficacy
-description: 培养皿内菌落直径测量与防效计算。支持十字交叉法最多6个测量值取均值、86 mm 培养皿像素标定、菌饼直径 6/8 mm 校正、3 重复处理汇总，以及后续图像标注与模型训练数据积累。适用于皿内菌落生长抑制试验；正式结果需人工复核边缘与异常值。
-author: gphuang
+description: 培养皿内菌落直径测量与防效计算；支持皿盖数字编号对应处理、人工核对后一键生成改名副本或直接改名，保留逐图来源和实验清单。提供十字交叉测量、86 mm 皿径标定、6/8 mm 菌饼校正、处理汇总及图像标注。用于皿内菌落生长抑制试验；数字识别候选和菌落边缘均需人工核对。
 metadata:
-  short-description: 皿内菌落直径与防效计算
+  short-description: 皿盖编号对应、一键改名与菌落测量防效
+  author: gphuang
+  version: 7.0.0
 ---
 
 # Petri Colony Efficacy
@@ -12,7 +13,7 @@ metadata:
 
 ## Required Outcomes
 
-每次运行至少产出：
+每次测量和防效计算至少产出以下文件；仅整理编号/改名时，产出逐图对应表、实验清单和改名事务记录，不要求先运行测量：
 
 - `colony_measurements.csv`：每个菌落的原始测量值、均值、SD、CV 和复核标记；
 - `treatment_summary.csv`：每个处理（含 CK）的重复数、平均直径和 SD；
@@ -38,6 +39,7 @@ metadata:
 8. 主菌落识别：默认 `--main-colony-mode auto`，优先选择靠近皿中心、面积较大、形状较规则的连通域作为主菌落。其他达到最小面积的连通域作为疑似杂菌/非主菌落候选，从主菌落直径中排除，并在 QA 图中用红色 `CONT` 标出。检测到杂菌候选或主菌落选择存在歧义时标记 `needs_review`。
 9. 菌丝外沿扩展支持 `--halo-mode auto|tight|loose`。`tight` 用于绿圈包含空白琼脂、皿底凸起、气泡或绿圈大于菌丝的图片；`loose` 用于绿色边框未囊括所有菌丝的图片。新数据先用 `auto`，必要时人工指定，不要把 tight/loose 写死为全局规则。
 10. 人工测量平面必须记录。若人工量的是皿底/底部直径，而图片是斜拍，二者不在同一平面，不能默认用皿外径 86 mm 直接等同。用 `reference_diameter_mm` 指定与人工测量同一参考特征的直径，并记录 `measurement_plane`（如 `bottom_inner`、`bottom_outer`、`agar_surface`、`ruler`）。图像标定默认用椭圆长轴，透视明显（`perspective_ratio < 0.85`）时自动标记复核。
+11. 皿盖编号表示本批处理，重复号另存。OCR 仅作未确认候选；使用用户核对后的编号—处理对应，不从拍摄顺序推断重复、不强制把模糊数字归入已知处理。默认一键生成改名副本，直接改名保留原图来源与撤销记录；后续测量以确认后的清单为准。
 
 ## 路径约定（重要）
 
@@ -53,6 +55,15 @@ metadata:
 执行命令前，把 `<SKILL_DIR>` 替换成上表对应的真实路径即可。
 
 ## Workflow
+
+### 皿盖写数字：编号对应与一键改名
+
+用户在皿盖上写 `1、2、3、11` 等编号，或要求优化批量改名时，先读 [references/number-label-workflow.md](references/number-label-workflow.md)。软件先填写本批“编号—处理全名”，显示数字识别候选和图片，核对后预览并一键生成改名副本；也支持直接改名和撤销。
+
+- 对应表模板：`assets/treatment-code-template.csv`。一个编号对应完整处理条件，浓度不同需区分；CK 明确填写为 `CK`。
+- `1-2` 表示处理 `1` 的重复 `2`；只有处理号时重复未知，不补成 `r1/r2/r3`。同皿复拍不能增加独立重复数。
+- skill 的命令行入口：`scripts/number_label_workflow.py scan/suggest/apply/undo`。`suggest` 离线读取数字候选，保留未确认状态；`apply` 使用明确确认的逐图 CSV，与软件共用命名逻辑。软件界面另提供框选编号区域重试，其真实皿盖准确率尚待验证。
+- 改名记录输出 `mapping.csv`、`plate_manifest.csv` 与事务日志；原有规范文件名/清单可直接进入以下测量流程，无须再次改名。
 
 ### CSV-only：首选、最稳定
 
@@ -206,6 +217,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "<SKILL_DIR>\scripts\run_pip
 
 ## References
 
+- [references/number-label-workflow.md](references/number-label-workflow.md)：皿盖数字编号、处理对应对话框、一键改名/撤销、逐图确认 CSV 和清单衔接。
 - [references/schema.md](references/schema.md)：输入列别名、单位、缺失值处理与输出字段。
 - [references/image-method.md](references/image-method.md)：皿/菌落检测参数、十字交叉采样和人工兜底。
 - [references/training-data.md](references/training-data.md)：后续图像标注、无序每皿标签、数据积累和模型训练约定。

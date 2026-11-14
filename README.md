@@ -1,5 +1,7 @@
 # 皿内菌落直径测量与防效统计（Petri Colony Efficacy）
 
+当前软件版本 **2.1.0**，skill 版本 **7.0.0**。新增“编号—处理全名”对话框、离线数字识别候选、人工核对、一键副本改名与可撤销的直接改名。操作见 [编号对应工作流](references/number-label-workflow.md)。数字识别需人工核对，尚未验证透明皿盖手写准确率。此 Windows 发布包内置 Python 3.11 OCR 组件；其他环境可按 requirements-ocr.txt 安装。
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)]()
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
